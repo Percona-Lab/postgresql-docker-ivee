@@ -220,7 +220,7 @@ pg_setup_hba_conf() {
 		echo
 		if [ 'trust' = "$POSTGRES_HOST_AUTH_METHOD" ]; then
 			echo '# warning trust is enabled for all connections'
-			echo '# see https://www.postgresql.org/docs/17/auth-trust.html'
+			echo "# see https://www.postgresql.org/docs/${PPG_MAJOR_VERSION}/auth-trust.html"
 		fi
 		echo "host all all all $POSTGRES_HOST_AUTH_METHOD"
 	} >> "$PGDATA/pg_hba.conf"
@@ -249,16 +249,13 @@ docker_temp_server_stop() {
 	pg_ctl -D "$PGDATA" -m fast -w stop
 }
 
-
-pg_setup_pg_stat_monitor() {
-	docker_process_sql --dbname postgres <<-'EOSQL'
-		alter system set shared_preload_libraries=pg_stat_monitor ;
-	EOSQL
-}
-
-pg_setup_timescaledb() {
-	docker_process_sql --dbname postgres <<-'EOSQL'
-		alter system set shared_preload_libraries=pg_stat_monitor,timescaledb ;
+pg_setup_extensions() {
+	libraries='pg_stat_monitor,timescaledb'
+	if [[ -n "${ENABLE_PG_TDE}" && "${ENABLE_PG_TDE}" != "0" ]]; then
+		libraries='pg_stat_monitor,timescaledb,pg_tde'
+	fi
+	docker_process_sql --dbname postgres <<-EOSQL
+		alter system set shared_preload_libraries=${libraries} ;
 	EOSQL
 }
 
@@ -285,7 +282,7 @@ _main() {
 		set -- postgres "$@"
 	fi
 
-	export PATH=$PATH:/usr/pgsql-17/bin
+	export PATH=$PATH:/usr/pgsql-${PPG_MAJOR_VERSION}/bin
 
 	if [ "$1" = 'postgres' ] && ! _pg_want_help "$@"; then
 		docker_setup_env
@@ -317,8 +314,7 @@ _main() {
 			docker_setup_db
 			docker_process_init_files /docker-entrypoint-initdb.d/*
 
-			pg_setup_pg_stat_monitor
-			pg_setup_timescaledb
+			pg_setup_extensions
 
 			docker_temp_server_stop
 			unset PGPASSWORD
