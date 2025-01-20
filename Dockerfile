@@ -54,6 +54,7 @@ RUN set -ex; \
         shadow-utils \
         libpq \
         libedit; \
+    microdnf -y reinstall tzdata; \
     microdnf clean all
 
 # the numeric UID is needed for OpenShift
